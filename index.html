@@ -1,0 +1,100 @@
+<html>
+	<head>
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.0/jquery.min.js"></script>
+		<style type="text/css">
+		</style>
+		<script type="text/javascript">
+			var fireLines = [];
+			var fireLinesIndex = null;
+
+			function getCanvas() {
+				return $("#canvas");
+			}
+
+			function getFireLine(){
+				return fireLines[fireLinesIndex];
+			}
+
+			function createFireLine(){
+				fireLines.push([]);
+				fireLinesIndex = fireLines.length - 1;
+			}
+
+			function newPoint(x, y){
+				var point = {};
+				point.x = x;
+				point.y = y;
+				return point;
+			}
+
+			function redraw(canvas){
+				drawImage(canvas, "https://inciweb.nwcg.gov/photos/FLBCP/2017-03-31-1738-Cowbell-Fire/picts/2017_04_12-14.47.49.919-CDT.jpeg ");
+
+				var fireLine = getFireLine();
+
+				for (var i = 0; i < fireLine.length; i++) {
+					var point = fireLine[i];
+					drawDot(canvas, point.x, point.y);
+				}
+
+				for (var i = 0; i < fireLine.length - 1; i++) {
+					var pointPrev = fireLine[i];
+					var pointNext = fireLine[i + 1];
+					drawLine(canvas, pointPrev.x, pointPrev.y, pointNext.x, pointNext.y);
+				}
+			}
+
+			function main() {
+				createFireLine();
+				var canvas = getCanvas();
+				
+				redraw(canvas);
+
+				addMouseListener(canvas);
+			}
+
+			function drawImage(canvas, imgUri){
+				var img = new Image;
+				img.src = imgUri;
+				var context = canvas[0].getContext('2d');
+			  	context.drawImage(img, 0, 0, canvas.width(), canvas.height());
+			}
+
+			function drawDot(canvas, x, y){
+				var context = canvas[0].getContext('2d');
+				context.strokeStyle = "red";
+				context.lineWidth = 1;
+				context.beginPath();
+				context.arc(x, y, 20, 0, 2*Math.PI);
+				context.stroke();
+			}
+
+			function drawLine(canvas, x, y, x2, y2){
+				var context = canvas[0].getContext('2d');
+				context.strokeStyle = "red";
+				context.lineWidth = 3;
+				context.beginPath();
+				context.moveTo(x, y);
+				context.lineTo(x2, y2);
+				context.stroke();
+			}
+
+			function addMouseListener(canvas){
+				var elem = canvas[0];
+
+				elem.addEventListener('click', function(event) {
+				    var rect = elem.getBoundingClientRect();
+				    var x = event.clientX - rect.left;
+				    var y = event.clientY - rect.top;
+
+				    getFireLine().push(newPoint(x, y));
+
+				    redraw(canvas);
+				}, false);
+			}
+		</script>
+	</head>
+	<body onload="main()">
+		<canvas id="canvas" width="800" height="800"></canvas>
+	</body>
+</html>
