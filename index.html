@@ -5,19 +5,25 @@
 		</style>
 		<script type="text/javascript">
 			var fireLines = [];
-			var fireLinesIndex = null;
 
 			function getCanvas() {
 				return $("#canvas");
 			}
 
 			function getFireLine(){
-				return fireLines[fireLinesIndex];
+				return fireLines[fireLines.length - 1];
 			}
 
 			function createFireLine(){
 				fireLines.push([]);
-				fireLinesIndex = fireLines.length - 1;
+			}
+
+			function removeFireLine(){
+				fireLines.pop();
+
+				if (fireLines.length == 0){
+					createFireLine();
+				}
 			}
 
 			function newPoint(x, y){
@@ -28,19 +34,10 @@
 			}
 
 			function redraw(canvas){
-				drawImage(canvas, "https://inciweb.nwcg.gov/photos/FLBCP/2017-03-31-1738-Cowbell-Fire/picts/2017_04_12-14.47.49.919-CDT.jpeg ");
+				drawImage(canvas, "https://inciweb.nwcg.gov/photos/FLBCP/2017-03-31-1738-Cowbell-Fire/picts/2017_04_12-14.47.49.919-CDT.jpeg");
 
-				var fireLine = getFireLine();
-
-				for (var i = 0; i < fireLine.length; i++) {
-					var point = fireLine[i];
-					drawDot(canvas, point.x, point.y);
-				}
-
-				for (var i = 0; i < fireLine.length - 1; i++) {
-					var pointPrev = fireLine[i];
-					var pointNext = fireLine[i + 1];
-					drawLine(canvas, pointPrev.x, pointPrev.y, pointNext.x, pointNext.y);
+				for (var i in fireLines){
+					drawFireLine(canvas, fireLines[i]);
 				}
 			}
 
@@ -51,6 +48,7 @@
 				redraw(canvas);
 
 				addMouseListener(canvas);
+				addKeyListener(canvas);
 			}
 
 			function drawImage(canvas, imgUri){
@@ -69,6 +67,19 @@
 				context.stroke();
 			}
 
+			function drawFireLine(canvas, fireLine){
+				for (var i = 0; i < fireLine.length; i++) {
+					var point = fireLine[i];
+					drawDot(canvas, point.x, point.y);
+				}
+
+				for (var i = 0; i < fireLine.length - 1; i++) {
+					var pointPrev = fireLine[i];
+					var pointNext = fireLine[i + 1];
+					drawLine(canvas, pointPrev.x, pointPrev.y, pointNext.x, pointNext.y);
+				}
+			}
+
 			function drawLine(canvas, x, y, x2, y2){
 				var context = canvas[0].getContext('2d');
 				context.strokeStyle = "red";
@@ -79,10 +90,38 @@
 				context.stroke();
 			}
 
+			function undo(canvas){
+				var fireLine = getFireLine();
+				fireLine.pop();
+				if (fireLine.length == 0){
+					removeFireLine();
+				}
+
+				redraw(canvas);
+			}
+
+			function submit(){
+				console.log("Submit!");
+			}
+
+			function reject(){
+				console.log("Reject!");
+			}
+
+			function nextImage(){
+				console.log("Next image!");
+			}
+
+			function previousImage(){
+				console.log("Previous image!");
+			}
+
 			function addMouseListener(canvas){
 				var elem = canvas[0];
 
 				elem.addEventListener('click', function(event) {
+					console.log("Clicked!");
+
 				    var rect = elem.getBoundingClientRect();
 				    var x = event.clientX - rect.left;
 				    var y = event.clientY - rect.top;
@@ -92,9 +131,28 @@
 				    redraw(canvas);
 				}, false);
 			}
+
+			function addKeyListener(canvas){
+				window.addEventListener('keydown', function(event){
+					console.log("Key! " + event.key);
+
+					if (event.key == 'z' && event.ctrlKey){
+						undo(canvas);
+					}
+
+					if (event.key == 'n'){
+						createFireLine();
+					}
+				}, false);
+			}
 		</script>
 	</head>
 	<body onload="main()">
 		<canvas id="canvas" width="800" height="800"></canvas>
+		<button onclick="submit()">submit</button>
+		<button onclick="reject()">reject</button>
+		<br>
+		<button onclick="nextImage()">nextImage</button>
+		<button onclick="previousImage()">previousImage</button>
 	</body>
 </html>
