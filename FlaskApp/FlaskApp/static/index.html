@@ -5,6 +5,8 @@
 		</style>
 		<script type="text/javascript">
 			var fireLines = [];
+			var imagesSourcePath = "images/";
+			var imageFileName = "test.jpeg";
 
 			function getCanvas() {
 				return $("#canvas");
@@ -12,6 +14,31 @@
 
 			function getFireLine(){
 				return fireLines[fireLines.length - 1];
+			}
+
+			function getUsername(){
+				return $("#username")[0].value.toLowerCase();
+			}
+
+			function validateUsername(){
+				var username = getUsername();
+				if (username == ""){
+					alert("Please provide a username so we can give you images you have not seen.");
+					return false;
+				}
+				return true;
+			}
+
+			function getImageURL(){
+				return imagesSourcePath + imageFileName;
+			}
+
+			function getImageName(newImageFileName){
+				return imageFileName;
+			}
+
+			function setImageName(newImageFileName){
+				imageFileName = newImageFileName;
 			}
 
 			function createFireLine(){
@@ -26,6 +53,11 @@
 				}
 			}
 
+			function clearAllFireLines(){
+				fireLines = [];
+				createFireLine();
+			}
+
 			function newPoint(x, y){
 				var point = {};
 				point.x = x;
@@ -33,12 +65,22 @@
 				return point;
 			}
 
-			function redraw(canvas){
-				drawImage(canvas, "https://inciweb.nwcg.gov/photos/FLBCP/2017-03-31-1738-Cowbell-Fire/picts/2017_04_12-14.47.49.919-CDT.jpeg");
+			function canvasCoordsToPercentCoords(canvas, point){
+				var elem = canvas[0];
+				return newPoint(point.x*1.0/elem.width, point.y*1.0/elem.height);
+			}
 
-				for (var i in fireLines){
-					drawFireLine(canvas, fireLines[i]);
-				}
+			function percentCoordsToCanvasCoords(canvas, point){
+				var elem = canvas[0];
+				return newPoint(point.x*elem.width, point.y*elem.height);
+			}			
+
+			function redraw(canvas){
+				drawImage(canvas, getImageURL(), function(){
+					for (var i in fireLines){
+						drawFireLine(canvas, fireLines[i]);
+					}
+				});
 			}
 
 			function main() {
@@ -51,11 +93,17 @@
 				addKeyListener(canvas);
 			}
 
-			function drawImage(canvas, imgUri){
+			function drawImage(canvas, imgUri, callback){
 				var img = new Image;
 				img.src = imgUri;
-				var context = canvas[0].getContext('2d');
-			  	context.drawImage(img, 0, 0, canvas.width(), canvas.height());
+				img.onload = function() {
+					var context = canvas[0].getContext('2d');
+					context.drawImage(img, 0, 0, canvas.width(), canvas.height());
+
+					if (callback){
+						callback();						
+					}
+				};
 			}
 
 			function drawDot(canvas, x, y){
@@ -69,13 +117,13 @@
 
 			function drawFireLine(canvas, fireLine){
 				for (var i = 0; i < fireLine.length; i++) {
-					var point = fireLine[i];
+					var point = percentCoordsToCanvasCoords(canvas, fireLine[i]);
 					drawDot(canvas, point.x, point.y);
 				}
 
 				for (var i = 0; i < fireLine.length - 1; i++) {
-					var pointPrev = fireLine[i];
-					var pointNext = fireLine[i + 1];
+					var pointPrev = percentCoordsToCanvasCoords(canvas, fireLine[i]);
+					var pointNext = percentCoordsToCanvasCoords(canvas, fireLine[i + 1]);
 					drawLine(canvas, pointPrev.x, pointPrev.y, pointNext.x, pointNext.y);
 				}
 			}
@@ -102,14 +150,57 @@
 
 			function submit(){
 				console.log("Submit!");
+				if (validateUsername()){
+					$.ajax({
+						type: "POST",
+						url: "../submit",
+						data: {
+							username: getUsername(),
+							photo_filename: getImageName(),
+							fireline_data: JSON.stringify(fireLines)
+						},
+						success: nextImage
+					});
+				}
 			}
 
 			function reject(){
 				console.log("Reject!");
+				if (validateUsername()){
+					$.ajax({
+						type: "POST",
+						url: "../reject",
+						data: {
+							username: getUsername(),
+							photo_filename: getImageName()
+						},
+						success: nextImage
+					});
+				}
 			}
 
 			function nextImage(){
 				console.log("Next image!");
+				if (validateUsername()){
+					$.ajax({
+						type: "POST",
+						url: "../next",
+						data: {
+							username: getUsername()
+						},
+						success: function(payload){
+							if (payload == ""){
+								alert("There are no more images to classify for this user.");
+							}
+							else {
+								setImageName(payload);
+								clearAllFireLines();
+								redraw(getCanvas());
+							}
+						},
+						dataType: "text"
+					});
+				}
 			}
 
 			function previousImage(){
@@ -126,7 +217,7 @@
 				    var x = event.clientX - rect.left;
 				    var y = event.clientY - rect.top;
 
-				    getFireLine().push(newPoint(x, y));
+				    getFireLine().push(canvasCoordsToPercentCoords(canvas, newPoint(x, y)));
 
 				    redraw(canvas);
 				}, false);
@@ -149,10 +240,16 @@
 	</head>
 	<body onload="main()">
 		<canvas id="canvas" width="800" height="800"></canvas>
+		<br>
+		Username: <input id="username" type="text">
+		<br>
 		<button onclick="submit()">submit</button>
 		<button onclick="reject()">reject</button>
 		<br>
-		<button onclick="nextImage()">next image</button>
+		<!-- <button onclick="nextImage()">next image</button>
 		<button onclick="previousImage()">previous image</button>
+		<br> -->
+		<button onclick="undo(getCanvas())">undo</button>
+		<button onclick="createFireLine()">new fire line</button>
 	</body>
 </html>

@@ -28,6 +28,18 @@ def close_connection(exception):
 def hello():
     return "Hellow world"
 
+@app.route("/submit", methods=['POST'])
+def submit():
+    photo_filename = request.form["photo_filename"]
+    username = request.form["username"]
+    fireline_data = request.form["fireline_data"]
+    db = get_db()
+    db.execute("INSERT OR IGNORE INTO Users (Username) VALUES (?)", [username])
+    db.execute("INSERT INTO Classifications (PhotoId, UserId, FirelineData, WasRejected) VALUES ((SELECT PhotoId FROM Photos WHERE Filename == ?), (SELECT UserId FROM Users WHERE Username == ?), ?, 0)", [photo_filename, username, fireline_data])
+    db.commit()
+
+    return "Success"
+
 @app.route("/reject", methods=['POST'])
 def reject():
     photo_filename = request.form["photo_filename"]
@@ -38,6 +50,20 @@ def reject():
     db.commit()
 
     return "Success"
+
+@app.route("/next", methods=['POST'])
+def next():
+    username = request.form["username"]
+    db = get_db()
+    db.execute("INSERT OR IGNORE INTO Users (Username) VALUES (?)", [username])
+    query_output = query_db("""SELECT Filename 
+FROM Photos AS P LEFT OUTER JOIN 
+(SELECT * FROM Classifications AS C 
+INNER JOIN Users AS U ON C.UserId = U.UserId
+WHERE Username = ?) AS CAndU ON CAndU.PhotoId = P.PhotoId
+WHERE CAndU.Username IS NULL LIMIT 1;""", [username], True)
+    
+    return query_output[0] if query_output else ""
 
 if __name__ == "__main__":
     app.run()
