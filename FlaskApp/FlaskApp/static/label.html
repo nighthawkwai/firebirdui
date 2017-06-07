@@ -1,0 +1,283 @@
+<html>
+	<head>
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.0/jquery.min.js"></script>
+		<style type="text/css">
+		</style>
+		<script type="text/javascript">
+			var fireLines = [];
+			var imagesSourcePath = "images/";
+			var imageFileName = "";
+
+			function getCanvas() {
+				return $("#canvas");
+			}
+
+			function getFireLine(){
+				return fireLines[fireLines.length - 1];
+			}
+
+			function getUsername(){
+				return $("#username")[0].value.toLowerCase();
+			}
+
+			function validateUsername(){
+				var username = getUsername();
+				if (username == ""){
+					alert("Please provide a username so we can give you images you have not seen.");
+					return false;
+				}
+				return true;
+			}
+
+			function getImageURL(){
+				return imagesSourcePath + imageFileName;
+			}
+
+			function getImageName(newImageFileName){
+				return imageFileName;
+			}
+
+			function setImageName(newImageFileName){
+				imageFileName = newImageFileName;
+			}
+
+			function createFireLine(){
+				if (fireLines.length == 0 || getFireLine().length != 0){
+					fireLines.push([]);
+				}
+			}
+
+			function removeFireLine(){
+				fireLines.pop();
+
+				if (fireLines.length == 0){
+					createFireLine();
+				}
+			}
+
+			function clearAllFireLines(){
+				fireLines = [];
+				createFireLine();
+			}
+
+			function newPoint(x, y){
+				var point = {};
+				point.x = x;
+				point.y = y;
+				return point;
+			}
+
+			function canvasCoordsToPercentCoords(canvas, point){
+				var elem = canvas[0];
+				return newPoint(point.x*1.0/elem.width, point.y*1.0/elem.height);
+			}
+
+			function percentCoordsToCanvasCoords(canvas, point){
+				var elem = canvas[0];
+				return newPoint(point.x*elem.width, point.y*elem.height);
+			}			
+
+			function redraw(canvas){
+				drawImage(canvas, getImageURL(), function(){
+					for (var i in fireLines){
+						drawFireLine(canvas, fireLines[i]);
+					}
+				});
+			}
+
+			function main() {
+				prepopulateFields();
+
+				nextImage();
+
+				var canvas = getCanvas();				
+
+				addMouseListener(canvas);
+				addKeyListener(canvas);
+			}
+
+			function prepopulateFields(){
+				var GET = {};
+				var queryString = window.location.search.replace(/^\?/, '');
+				queryString.split(/\&/).forEach(function(keyValuePair) {
+					var paramName = decodeURIComponent(keyValuePair.replace(/=.*$/, "")); // some decoding is probably necessary
+					var paramValue = decodeURIComponent(keyValuePair.replace(/^[^=]*\=/, "")); // some decoding is probably necessary
+					GET[paramName] = paramValue;
+				});
+
+				// Check if the username data is in the address
+				if (GET["username"]){
+					$("#username")[0].value = GET["username"];     
+				}
+				else{
+					window.location = "./index.html";
+				}
+			}
+
+			function drawImage(canvas, imgUri, callback){
+				var img = new Image;
+				img.src = imgUri;
+				img.onload = function() {
+					var context = canvas[0].getContext('2d');
+					context.drawImage(img, 0, 0, canvas.width(), canvas.height());
+
+					if (callback){
+						callback();						
+					}
+				};
+			}
+
+			function drawDot(canvas, x, y){
+				var context = canvas[0].getContext('2d');
+				context.strokeStyle = "red";
+				context.lineWidth = 1;
+				context.beginPath();
+				context.arc(x, y, 20, 0, 2*Math.PI);
+				context.stroke();
+			}
+
+			function drawFireLine(canvas, fireLine){
+				for (var i = 0; i < fireLine.length; i++) {
+					var point = percentCoordsToCanvasCoords(canvas, fireLine[i]);
+					drawDot(canvas, point.x, point.y);
+				}
+
+				for (var i = 0; i < fireLine.length - 1; i++) {
+					var pointPrev = percentCoordsToCanvasCoords(canvas, fireLine[i]);
+					var pointNext = percentCoordsToCanvasCoords(canvas, fireLine[i + 1]);
+					drawLine(canvas, pointPrev.x, pointPrev.y, pointNext.x, pointNext.y);
+				}
+			}
+
+			function drawLine(canvas, x, y, x2, y2){
+				var context = canvas[0].getContext('2d');
+				context.strokeStyle = "red";
+				context.lineWidth = 3;
+				context.beginPath();
+				context.moveTo(x, y);
+				context.lineTo(x2, y2);
+				context.stroke();
+			}
+
+			function undo(canvas){
+				var fireLine = getFireLine();
+				fireLine.pop();
+				if (fireLine.length == 0){
+					removeFireLine();
+				}
+
+				redraw(canvas);
+			}
+
+			function submit(){
+				console.log("Submit!");
+				if (validateUsername()){
+					$.ajax({
+						type: "POST",
+						url: "../submit",
+						data: {
+							username: getUsername(),
+							photo_filename: getImageName(),
+							fireline_data: JSON.stringify(fireLines)
+						},
+						success: nextImage
+					});
+				}
+			}
+
+			function reject(){
+				console.log("Reject!");
+				if (validateUsername()){
+					$.ajax({
+						type: "POST",
+						url: "../reject",
+						data: {
+							username: getUsername(),
+							photo_filename: getImageName()
+						},
+						success: nextImage
+					});
+				}
+			}
+
+			function nextImage(){
+				console.log("Next image!");
+				if (validateUsername()){
+					$.ajax({
+						type: "POST",
+						url: "../next",
+						data: {
+							username: getUsername()
+						},
+						success: function(payload){
+							if (payload == ""){
+								noMoreImages();
+							}
+							else {
+								setImageName(payload);
+								clearAllFireLines();
+								redraw(getCanvas());
+							}
+						},
+						dataType: "text"
+					});
+				}
+			}
+
+			function noMoreImages(){
+				console.log("No more images!");
+				alert("There are no more images to classify for this user.");
+
+				window.location = "./thanks.html";
+			}
+
+			function previousImage(){
+				console.log("Previous image!");
+			}
+
+			function addMouseListener(canvas){
+				var elem = canvas[0];
+
+				elem.addEventListener('click', function(event) {
+					console.log("Clicked!");
+
+				    var rect = elem.getBoundingClientRect();
+				    var x = event.clientX - rect.left;
+				    var y = event.clientY - rect.top;
+
+				    getFireLine().push(canvasCoordsToPercentCoords(canvas, newPoint(x, y)));
+
+				    redraw(canvas);
+				}, false);
+			}
+
+			function addKeyListener(canvas){
+				window.addEventListener('keydown', function(event){
+					console.log("Key! " + event.key);
+
+					if (event.key == 'z' && event.ctrlKey){
+						undo(canvas);
+					}
+
+					if (event.key == 'n'){
+						createFireLine();
+					}
+				}, false);
+			}
+		</script>
+	</head>
+	<body onload="main()">
+		<canvas id="canvas" width="800" height="800"></canvas>
+		<br>
+		Username: <input id="username" type="text">
+		<br>
+		<button onclick="submit()">submit</button>
+		<button onclick="reject()">reject</button>
+		<br>
+		<!-- <button onclick="nextImage()">get new image</button> -->
+		<!-- <button onclick="previousImage()">previous image</button> -->
+		<!-- <br> -->
+		<button onclick="undo(getCanvas())">undo</button>
+		<button onclick="createFireLine()">new fire line</button>
+	</body>
+</html>

@@ -2,9 +2,12 @@ import sqlite3
 import os
 from flask import g
 from flask import Flask, request
+from os import listdir
+from os.path import isfile, join
 
 app = Flask(__name__)
 DATABASE = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../database/firebirddb.db'))
+IMAGES_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../images'))
 
 def get_db():
     db = getattr(g, '_database', None)
@@ -64,6 +67,16 @@ WHERE Username = ?) AS CAndU ON CAndU.PhotoId = P.PhotoId
 WHERE CAndU.Username IS NULL LIMIT 1;""", [username], True)
     
     return query_output[0] if query_output else ""
+
+@app.route("/refresh_image_db", methods=['POST'])
+def refresh_image_db():
+    files = [f for f in listdir(IMAGES_PATH) if isfile(join(IMAGES_PATH, f))]
+    db = get_db()
+    for filename in files:
+        db.execute("INSERT OR IGNORE INTO Photos (Filename) VALUES (?)", [filename])
+    db.commit()
+
+    return "Success"
 
 if __name__ == "__main__":
     app.run()
